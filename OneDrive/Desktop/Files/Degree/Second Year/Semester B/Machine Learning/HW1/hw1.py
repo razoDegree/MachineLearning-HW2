@@ -76,7 +76,34 @@ def compute_cost(X, y, theta):
     ###########################################################################
     # TODO: Implement the MSE cost function.                                  #
     ###########################################################################
-    pass
+    m = X.shape[0] # represents the number of instances in X
+
+    XMatrix = np.asmatrix(X) # Builds X as Matrix
+    yMatrix = np.asmatrix(y) # Builds y as Matrix
+    thetaMatrix = np.asmatrix(theta) # Builds Theta as Matrix
+
+    transposedTheta = thetaMatrix.transpose() # Transpose theta
+    transposedY = yMatrix.transpose() # Transpose Y
+
+    predictedYs = np.matmul(XMatrix, transposedTheta) # X*Theta !Needs to be checked if its ok that the multipication is reversed
+    totalGap = predictedYs - transposedY
+    sigma = totalGap.sum()
+    J = (1/(2 * m) * sigma)
+
+    # print("X Matrix ------")    
+    # print(XMatrix)    
+    # print("Transposed Theta matrix------")    
+    # print(transposedTheta) 
+    # print("Transposed Y matrix------")    
+    # print(transposedY)  
+    # print("X * Theta ------")  
+    # print(predictedYs)    
+    # print("X * Theta - y ------")  
+    # print(totalGap)    
+    # print("Sigma(X * Theta - y) ------")  
+    # print(sigma)    
+    # print("(1/2m) * Sigma(X * Theta - y) ------")  
+    # print(J)   
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
