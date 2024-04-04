@@ -85,10 +85,10 @@ def compute_cost(X, y, theta):
     transposedTheta = thetaMatrix.transpose() # Transpose theta
     transposedY = yMatrix.transpose() # Transpose Y
 
-    predictedYs = np.matmul(XMatrix, transposedTheta) # X*Theta !Needs to be checked if its ok that the multipication is reversed
-    totalGap = predictedYs - transposedY
-    sigma = totalGap.sum()
-    J = (1/(2 * m) * sigma)
+    MultResult = np.matmul(XMatrix, transposedTheta) # X*Theta !Needs to be checked if its ok that the multipication is reversed
+    totalGap = MultResult - transposedY
+    squareGapAndSum = np.matmul(totalGap.transpose(), totalGap)
+    J = (1/(2 * m) * squareGapAndSum[0,0])
 
     # print("X Matrix ------")    
     # print(XMatrix)    
@@ -97,9 +97,11 @@ def compute_cost(X, y, theta):
     # print("Transposed Y matrix------")    
     # print(transposedY)  
     # print("X * Theta ------")  
-    # print(predictedYs)    
+    # print(MultResult)    
     # print("X * Theta - y ------")  
     # print(totalGap)    
+    # print("Square Gap and Sum ------")  
+    # print(squareGapAndSum)    
     # print("Sigma(X * Theta - y) ------")  
     # print(sigma)    
     # print("(1/2m) * Sigma(X * Theta - y) ------")  
