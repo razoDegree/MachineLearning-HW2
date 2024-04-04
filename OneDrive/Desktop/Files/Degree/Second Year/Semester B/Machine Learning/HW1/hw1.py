@@ -82,14 +82,13 @@ def compute_cost(X, y, theta):
     yMatrix = np.asmatrix(y) # Builds y as Matrix
     thetaMatrix = np.asmatrix(theta) # Builds Theta as Matrix
 
-    transposedTheta = thetaMatrix.transpose() # Transpose theta
-    transposedY = yMatrix.transpose() # Transpose Y
+    transposedX = XMatrix.transpose() # Transpose X
 
-    MultResult = np.matmul(XMatrix, transposedTheta) # X*Theta !Needs to be checked if its ok that the multipication is reversed
-    totalGap = MultResult - transposedY
-    squareGapAndSum = np.matmul(totalGap.transpose(), totalGap) # Calculate the squares and sum it
+    MultResult = np.matmul(thetaMatrix, transposedX) # Theta*X 
+    delta = MultResult - yMatrix
+    squareGapAndSum = np.matmul(delta, delta.transpose()) # Calculate the squares and sum it
     J = (1/(2 * m) * squareGapAndSum[0,0])
-    
+
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -121,7 +120,23 @@ def gradient_descent(X, y, theta, alpha, num_iters):
     ###########################################################################
     # TODO: Implement the gradient descent optimization algorithm.            #
     ###########################################################################
-    pass
+    m = X.shape[0] # represents the number of instances in X
+
+    XMatrix = np.asmatrix(X) # Builds X as Matrix
+    yMatrix = np.asmatrix(y) # Builds y as Matrix
+    thetaMatrix = np.asmatrix(theta) # Builds Theta as Matrix
+    transposedX = XMatrix.transpose() # Transpose X
+
+    for i in range(num_iters):
+        MultResult = np.matmul(thetaMatrix, transposedX) # Theta*X 
+        delta = MultResult - yMatrix
+
+        MultResultDelX = np.matmul(delta, XMatrix)
+        thetaMatrix = thetaMatrix - ((alpha / m) * MultResultDelX)
+        theta = thetaMatrix.tolist()
+        J_history.append(compute_cost(X, y, theta))
+
+    print(theta)
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
