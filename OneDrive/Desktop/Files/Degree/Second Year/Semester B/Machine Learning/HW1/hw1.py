@@ -78,16 +78,10 @@ def compute_cost(X, y, theta):
     ###########################################################################
     m = X.shape[0] # represents the number of instances in X
 
-    XMatrix = np.asmatrix(X) # Builds X as Matrix
-    yMatrix = np.asmatrix(y) # Builds y as Matrix
-    thetaMatrix = np.asmatrix(theta) # Builds Theta as Matrix
-
-    transposedX = XMatrix.transpose() # Transpose X
-
-    MultResult = np.matmul(thetaMatrix, transposedX) # Theta*X 
-    delta = MultResult - yMatrix
-    squareGapAndSum = np.matmul(delta, delta.transpose()) # Calculate the squares and sum it
-    J = (1/(2 * m) * squareGapAndSum[0,0])
+    MultResult = np.dot(X, theta) # X * Theta
+    delta = MultResult - y # h(X) - y
+    deltaSquare = delta ** 2 
+    J = np.sum((1 / (2 * m)) * deltaSquare)
 
     ###########################################################################
     #                             END OF YOUR CODE                            #
@@ -122,21 +116,12 @@ def gradient_descent(X, y, theta, alpha, num_iters):
     ###########################################################################
     m = X.shape[0] # represents the number of instances in X
 
-    XMatrix = np.asmatrix(X) # Builds X as Matrix
-    yMatrix = np.asmatrix(y) # Builds y as Matrix
-    thetaMatrix = np.asmatrix(theta) # Builds Theta as Matrix
-    transposedX = XMatrix.transpose() # Transpose X
-
     for i in range(num_iters):
-        MultResult = np.matmul(thetaMatrix, transposedX) # Theta*X 
-        delta = MultResult - yMatrix
-
-        MultResultDelX = np.matmul(delta, XMatrix)
-        thetaMatrix = thetaMatrix - ((alpha / m) * MultResultDelX)
-        theta = thetaMatrix.tolist()
+        MultResult = np.dot(X, theta) # Theta*X 
+        delta = MultResult - y # h(X) - y
+        theta = theta - (alpha / m) * np.dot(X.T, delta) # Theta - (alpha / m) * X^t * (h(X) - y)
         J_history.append(compute_cost(X, y, theta))
 
-    print(theta)
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -163,7 +148,10 @@ def compute_pinv(X, y):
     ###########################################################################
     # TODO: Implement the pseudoinverse algorithm.                            #
     ###########################################################################
-    pass
+    xTransposedTimesX = np.dot(X.T, X) # X^t * X
+    pinv = np.dot(np.linalg.inv(xTransposedTimesX), X.T) # (X^t * X)^-1 * X^t
+    pinv_theta = np.dot(pinv, y) # pinv * y
+
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -193,7 +181,17 @@ def efficient_gradient_descent(X, y, theta, alpha, num_iters):
     ###########################################################################
     # TODO: Implement the efficient gradient descent optimization algorithm.  #
     ###########################################################################
-    pass
+    m = X.shape[0] # represents the number of instances in X
+
+    for i in range(num_iters):
+        MultResult = np.dot(X, theta) # X * Theta 
+        delta = MultResult - y # h(X) - y
+        theta = theta - (alpha / m) * np.dot(X.T, delta) # Theta - (alpha / m) * X^t * (h(X) - y)
+        J_history.append(compute_cost(X, y, theta))
+
+        if (len(J_history) > 1 and (J_history[-2] - J_history[-1] < 1e-8)): # Check if the diffrences between the 2 last costs is less then 1e-8
+            break
+
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -220,7 +218,11 @@ def find_best_alpha(X_train, y_train, X_val, y_val, iterations):
     ###########################################################################
     # TODO: Implement the function and find the best alpha value.             #
     ###########################################################################
-    pass
+    base_theta = np.random.random(X_train.shape[1]) # getting a random 2D list of n features as guessed theta
+
+    for alpha in alphas:
+        theta, J_history = efficient_gradient_descent(X_train, y_train, base_theta, alpha, iterations)
+        alpha_dict[alpha] = compute_cost(X_val, y_val, theta) 
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -248,7 +250,27 @@ def forward_feature_selection(X_train, y_train, X_val, y_val, best_alpha, iterat
     #####c######################################################################
     # TODO: Implement the function and find the best alpha value.             #
     ###########################################################################
-    pass
+    for round in range(5):
+        costs_features_dict = {} # {feature: cost}
+        min_cost_feature = -1
+        base_theta = np.random.random(round + 2) # Needs to be changed each round since the amout of features is increasing by 1
+
+        for feature in range(X_train.shape[1]):
+            if feature not in selected_features:
+                selected_features.append(feature) # Adding the feature into selected features table - temp
+
+                train_feature, test_feature = X_train[:,selected_features], X_val[:,selected_features] # Selects only the columns based on the selected features 
+                train_feature, test_feature = apply_bias_trick(train_feature), apply_bias_trick(test_feature) # Applying the bais trick
+
+                theta, J_history = efficient_gradient_descent(train_feature, y_train, base_theta, best_alpha, iterations)
+                costs_features_dict[feature] = compute_cost(test_feature, y_val, theta)
+
+                selected_features.remove(feature) # Remove the feature from the selected features table
+
+                if min_cost_feature == -1 or costs_features_dict[min_cost_feature] > costs_features_dict[feature]: # Maintaining the minimal cost feature
+                    min_cost_feature = feature
+        selected_features.append(min_cost_feature)
+                
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
