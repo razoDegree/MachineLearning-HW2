@@ -22,12 +22,12 @@ def preprocess(X,y):
     ###########################################################################
     # TODO: Implement the normalization function.                             #
     ###########################################################################
-    meanX = np.average(X)
+    meanX = np.mean(X)
     maxX = np.max(X)
     minX = np.min(X)
     X = (X - meanX)/(maxX - minX) # Replace each instance for features based on mean normalization
     
-    meanY = np.average(y)
+    meanY = np.mean(y)
     maxY = np.max(y)
     minY = np.min(y)
     y = (y - meanY)/(maxY - minY) # Replace each instance for targets based on mean normalization
@@ -117,7 +117,7 @@ def gradient_descent(X, y, theta, alpha, num_iters):
     m = X.shape[0] # represents the number of instances in X
 
     for i in range(num_iters):
-        MultResult = np.dot(X, theta) # Theta*X 
+        MultResult = np.dot(X, theta) # X*Theta 
         delta = MultResult - y # h(X) - y
         theta = theta - (alpha / m) * np.dot(X.T, delta) # Theta - (alpha / m) * X^t * (h(X) - y)
         J_history.append(compute_cost(X, y, theta))
@@ -292,7 +292,24 @@ def create_square_features(df):
     ###########################################################################
     # TODO: Implement the function to add polynomial features                 #
     ###########################################################################
-    pass
+    new_features = []
+    features_name = df.columns.values # Gets the features names
+
+    for feature_number_index in range (len(features_name)): # Runs over the base features
+        
+        for secondery_feature_index in range(feature_number_index, len(features_name)): # Runs over the secondery features 
+            if feature_number_index != secondery_feature_index:
+                new_feature_name = features_name[feature_number_index] + "*" + features_name[secondery_feature_index]
+            else:
+                new_feature_name = features_name[feature_number_index] + "^2"
+            
+            new_feature_column = df_poly[features_name[feature_number_index]] * df_poly[features_name[secondery_feature_index]] # Calculating the new values of the new features
+            new_feature_column.name = new_feature_name # Making the new column of the new feature
+
+            new_features.append(new_feature_column)
+
+    df_poly = pd.concat([df_poly] + new_features, axis=1)
+
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
