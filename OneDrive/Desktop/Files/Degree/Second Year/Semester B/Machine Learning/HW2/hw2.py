@@ -130,8 +130,6 @@ def calc_entropy(data):
     return entropy
 
 class DecisionNode:
-
-    
     def __init__(self, data, impurity_func, feature=-1,depth=0, chi=1, max_depth=1000, gain_ratio=False):
         
         self.data = data # the relevant data for the node
@@ -183,8 +181,8 @@ class DecisionNode:
         ###########################################################################
         # TODO: Implement the function.                                           #
         ###########################################################################
-        self.children.apped(node)
-        self.children_values.apped(val)
+        self.children.append(node)
+        self.children_values.append(val)
         ###########################################################################
         #                             END OF YOUR CODE                            #
         ###########################################################################
@@ -260,6 +258,10 @@ class DecisionNode:
             entropy_S = calc_entropy(self.data)
             info_gain = entropy_S - sigma
             split_info = -sigma_info
+            
+            if split_info == 0: # In situation where we need to dived by zero
+                return 0, groups
+
             goodness = info_gain / split_info # GainRation
         
         ###########################################################################
@@ -279,7 +281,7 @@ class DecisionNode:
         # TODO: Implement the function.                                           #
         ###########################################################################
         features = self.data.shape[1] - 1 # Gets an array of all the values that possible to gets from feature
-        max_feature_goodness = -1
+        max_feature_goodness = 0
         max_feature_groups = {}
 
         # Checking if it possible to create more children
@@ -294,12 +296,52 @@ class DecisionNode:
                 max_feature_goodness = feature_goodness
                 max_feature_groups = feature_groups
                 self.feature = feature
+
+        # Checking if the impurty is 0         
+        if max_feature_goodness == 0:
+            self.terminal = True
+            return
         
-        # Creating the children nodes
         values = np.unique(self.data.T[self.feature]) # Gets an array of all the values that possible to gets from feature
+
+        # Dealing with chi test
+        if self.chi != 1: 
+            labels, counts = np.unique(self.data.T[-1], return_counts=True)
+            counts = counts / self.data.shape[0]
+            if (len(labels) == 2):
+                probability_edible, probability_poisonous = counts[np.where(labels == 'edible')], counts[np.where(labels == 'poisonous')]
+            else:
+                try:
+                    probability_edible = counts[np.where(labels == 'edible')]
+                    probability_poisonous = 0
+                except:
+                    probability_poisonous = counts[np.where(labels == 'poisonous')]
+                    probability_edible = 0
+
+            chi_value = 0
+
+            # Calculating X^2 
+            for value in values: 
+                Df = len(max_feature_groups[value])
+                Pf = len(max_feature_groups[value][max_feature_groups[value][:,-1] == 'edible'])
+                Nf = len(max_feature_groups[value][max_feature_groups[value][:,-1] == 'poisonous'])
+                E_zero, E_one = Df * probability_edible, Df * probability_poisonous
+                if E_zero != 0:
+                    chi_value += ((Nf - E_zero) ^ 2) / E_zero
+                if E_one != 0:
+                    chi_value += ((Pf - E_one) ^ 2) / E_one
+
+            degree_of_freedom = len(values) - 1
+
+            # Checking if the distrebution is randomize or have predictive power
+            if chi_value < chi_table[degree_of_freedom][self.chi]:
+                self.terminal = True
+                return
+            
+        # Creating the children nodes
         for value in values:
             children_node = DecisionNode(max_feature_groups[value], self.impurity_func, -1, self.depth + 1, self.chi, self.max_depth, self.gain_ratio)
-            self.add_child(children_node, value)        
+            self.add_child(children_node, value)
         ###########################################################################
         #                             END OF YOUR CODE                            #
         ###########################################################################
@@ -326,7 +368,17 @@ class DecisionTree:
         ###########################################################################
         # TODO: Implement the function.                                           #
         ###########################################################################
-        pass
+        self.root = DecisionNode(self.data, self.impurity_func, chi = self.chi,max_depth = self.max_depth, gain_ratio = self.gain_ratio) # Creating the root node
+        
+        nodes_queue = [] # Holding the nodes that supposed to split
+        nodes_queue.append(self.root)
+
+        while len(nodes_queue) > 0: # Loop over the nodes in the tree
+            current_node = nodes_queue.pop(0) 
+            current_node.calc_feature_importance(current_node.data.shape[0])
+            current_node.split() # Create new children nodes
+            nodes_queue += current_node.children
+
         ###########################################################################
         #                             END OF YOUR CODE                            #
         ###########################################################################
@@ -345,7 +397,16 @@ class DecisionTree:
         ###########################################################################
         # TODO: Implement the function.                                           #
         ###########################################################################
-        pass
+        node = self.root
+        
+        while not node.terminal:
+            try:
+                value = instance[node.feature] # Gets the value of the feature
+                value_index = node.children_values.index(value) # Gets the index of the value in childern values attribute
+                node = node.children[value_index]
+            except:
+                break
+
         ###########################################################################
         #                             END OF YOUR CODE                            #
         ###########################################################################
@@ -364,7 +425,13 @@ class DecisionTree:
         ###########################################################################
         # TODO: Implement the function.                                           #
         ###########################################################################
-        pass
+        num_of_correctness = 0
+        for row in dataset:
+            prediction = self.predict(row)
+            if prediction[0] == row[-1]:
+                num_of_correctness += 1
+        
+        accuracy = num_of_correctness * 100 / dataset.shape[0]
         ###########################################################################
         #                             END OF YOUR CODE                            #
         ###########################################################################
@@ -393,7 +460,12 @@ def depth_pruning(X_train, X_validation):
         ###########################################################################
         # TODO: Implement the function.                                           #
         ###########################################################################
-        pass
+        train_tree = DecisionTree(data = X_train, impurity_func = calc_entropy, gain_ratio = True, max_depth = max_depth) # Creating the training tree
+
+        train_tree.build_tree() # Building the training tree
+
+        training.append(train_tree.calc_accuracy(X_train))
+        validation.append(train_tree.calc_accuracy(X_validation))
         ###########################################################################
         #                             END OF YOUR CODE                            #
         ###########################################################################
@@ -417,19 +489,41 @@ def chi_pruning(X_train, X_test):
     - depth: the tree depth for each chi value
     """
     chi_training_acc = []
-    chi_validation_acc  = []
+    chi_testing_acc  = []
     depth = []
 
     ###########################################################################
     # TODO: Implement the function.                                           #
     ###########################################################################
-    pass
+    for p_value in [1, 0.5, 0.25, 0.1, 0.05, 0.0001]:
+        train_tree = DecisionTree(data = X_train, impurity_func = calc_entropy, gain_ratio = True, chi = p_value) # Creating the training tree
+
+        train_tree.build_tree() # Building the training tree
+
+        chi_training_acc.append(train_tree.calc_accuracy(X_train))
+        chi_testing_acc.append(train_tree.calc_accuracy(X_test))
+        depth.append(tree_depth(train_tree.root))
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
         
     return chi_training_acc, chi_testing_acc, depth
 
+def tree_depth(root):
+    """ Calculates the trees at the given root depth.
+
+    Input:
+    - root: the root, DecisionNode, of the DecisionTree.
+
+    Output:
+    - depth: the depth of the tree.
+    """
+
+    if root.terminal == True:
+        return root.depth
+    
+    depth_list = [tree_depth(node) for node in root.children]
+    return np.max(depth_list)
 
 def count_nodes(node):
     """
@@ -443,7 +537,10 @@ def count_nodes(node):
     ###########################################################################
     # TODO: Implement the function.                                           #
     ###########################################################################
-    pass
+    if node.treminal == True: # Base case 
+        return 1
+    
+    n_nodes = np.sum([count_nodes(child) for child in node.children]) + 1 # Recursion
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
