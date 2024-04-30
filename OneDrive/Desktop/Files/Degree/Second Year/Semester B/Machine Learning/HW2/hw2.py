@@ -77,16 +77,9 @@ def calc_gini(data):
     # TODO: Implement the function.                                           #
     ###########################################################################
     S_size = data.shape[0] # Number of total instanses in data
-
-    edibles = data[data[:,-1] == 'e'] # all the edibles rows
-    edible_size = edibles.shape[0] # amout of rows
-
-    poisonous = data[data[:,-1] == 'p'] # all the poisonous rows
-    poisonous_size = poisonous.shape[0] # amout of rows
-
-    sigma = (edible_size / S_size) ** 2 + (poisonous_size / S_size) ** 2 # Calculate the squard of the probabilties
-
-    # print(f"S_size: {S_size}\nedible_size: {edible_size}\npoisonous_size: {poisonous_size}")
+    
+    labels_count = np.unique(data[:, -1], return_counts=True)[1] # Gets how much instanses there is with specific label
+    sigma = np.sum((labels_count / S_size) ** 2) # Summing the squar of probabilties
 
     gini = 1 - sigma
     ###########################################################################
@@ -109,19 +102,9 @@ def calc_entropy(data):
     # TODO: Implement the function.                                           #
     ###########################################################################
     S_size = data.shape[0] # Number of total instanses in data
-    sigma = 0
+    labels_count = np.unique(data[:, -1], return_counts=True)[1] # Gets how much instanses there is with specific label
 
-    edibles = data[data[:,-1] == 'e'] # all the edibles rows
-    edible_size = edibles.shape[0] # amout of rows
-    if edible_size != 0:
-        sigma = (edible_size / S_size) * np.log2(edible_size / S_size) # Calculate impurty of edibles
-    
-    poisonous = data[data[:,-1] == 'p'] # all the poisonous rows
-    poisonous_size = poisonous.shape[0] # amout of rows
-    if poisonous_size != 0:
-        sigma += (poisonous_size / S_size) * np.log2(poisonous_size / S_size) # Calculate impurty of edibles and poisonous
-
-    # print(f"S_size: {S_size}\nedible_size: {edible_size}\npoisonous_size: {poisonous_size}")
+    sigma = np.sum((labels_count / S_size) * np.log2(labels_count / S_size)) # Calculate impurty of edibles
 
     entropy = -sigma
     ###########################################################################
@@ -162,11 +145,12 @@ class DecisionNode:
         edible_size = edibles.shape[0] # amout of edibles
 
         poisonous_size = S_size - edible_size # amout of poisonous
-
-        if poisonous_size < edible_size:
+        
+        if poisonous_size <= edible_size:
             pred = "edible"
         else:
             pred = "poisonous"
+
         ###########################################################################
         #                             END OF YOUR CODE                            #
         ###########################################################################
@@ -200,6 +184,10 @@ class DecisionNode:
         ###########################################################################
         # TODO: Implement the function.                                           #
         ###########################################################################
+        if self.feature == -1:
+            self.feature_importance = 0
+            return
+        
         sigma = 0
 
         values = np.unique(self.data.T[self.feature]) # Gets an array of all the values that possible to gets from feature
@@ -269,7 +257,7 @@ class DecisionNode:
         ###########################################################################
         return goodness, groups
     
-    def split(self): ################################ Didn't Finished ###########################################
+    def split(self):
         """
         Splits the current node according to the self.impurity_func. This function finds
         the best feature to split according to and create the corresponding children.
@@ -285,7 +273,7 @@ class DecisionNode:
         max_feature_groups = {}
 
         # Checking if it possible to create more children
-        if self.depth == self.max_depth:
+        if self.depth == self.max_depth or self.terminal:
             self.terminal = True
             return
 
@@ -297,7 +285,7 @@ class DecisionNode:
                 max_feature_groups = feature_groups
                 self.feature = feature
 
-        # Checking if the impurty is 0         
+        # Checking if there is helpful feature
         if max_feature_goodness == 0:
             self.terminal = True
             return
@@ -305,48 +293,49 @@ class DecisionNode:
         values = np.unique(self.data.T[self.feature]) # Gets an array of all the values that possible to gets from feature
 
         # Dealing with chi test
-        if self.chi != 1: 
-            labels, counts = np.unique(self.data.T[-1], return_counts=True)
-            counts = counts / self.data.shape[0]
-            if (len(labels) == 2):
-                probability_edible, probability_poisonous = counts[np.where(labels == 'edible')], counts[np.where(labels == 'poisonous')]
-            else:
-                try:
-                    probability_edible = counts[np.where(labels == 'edible')]
-                    probability_poisonous = 0
-                except:
-                    probability_poisonous = counts[np.where(labels == 'poisonous')]
-                    probability_edible = 0
-
-            chi_value = 0
-
-            # Calculating X^2 
-            for value in values: 
-                Df = len(max_feature_groups[value])
-                Pf = len(max_feature_groups[value][max_feature_groups[value][:,-1] == 'edible'])
-                Nf = len(max_feature_groups[value][max_feature_groups[value][:,-1] == 'poisonous'])
-                E_zero, E_one = Df * probability_edible, Df * probability_poisonous
-                if E_zero != 0:
-                    chi_value += ((Nf - E_zero) ^ 2) / E_zero
-                if E_one != 0:
-                    chi_value += ((Pf - E_one) ^ 2) / E_one
-
-            degree_of_freedom = len(values) - 1
-
-            # Checking if the distrebution is randomize or have predictive power
-            if chi_value < chi_table[degree_of_freedom][self.chi]:
-                self.terminal = True
-                return
+        if not check_chi(self.chi, self.data, values, max_feature_groups): 
+            self.terminal = True
+            return
             
         # Creating the children nodes
         for value in values:
             children_node = DecisionNode(max_feature_groups[value], self.impurity_func, -1, self.depth + 1, self.chi, self.max_depth, self.gain_ratio)
             self.add_child(children_node, value)
+
         ###########################################################################
         #                             END OF YOUR CODE                            #
         ###########################################################################
 
-                    
+def check_chi(chi_value, data, values, max_feature_groups):
+    """
+    This function checks if the chi spliting is randomaize or is it 
+    has a probabilty differences
+    """
+    if chi_value != 1: 
+            labels, counts = np.unique(data.T[-1], return_counts=True)
+
+            counts = counts / data.shape[0]
+            chi_sqaure = 0
+            
+            # print(f"values: {values}")
+            # print(f"max_feature_groups: {max_feature_groups}")
+
+            # Calculating X^2 
+            for value in values: 
+                # print(f"value: {value}")
+                Df = len(max_feature_groups[value])   
+                for label in range(len(labels)):
+                    expected = counts[label] * Df
+                    observed = len(max_feature_groups[value][max_feature_groups[value][:,-1] == labels[label]])
+                    chi_sqaure += ((observed - expected) ** 2) / expected
+
+            degree_of_freedom = len(values) - 1
+
+            # Checking if the distrebution is randomize or have predictive power
+            if chi_sqaure < chi_table[degree_of_freedom][chi_value]:
+                return False
+    return True
+
 class DecisionTree:
     def __init__(self, data, impurity_func, feature=-1, chi=1, max_depth=1000, gain_ratio=False):
         self.data = data # the relevant data for the tree
@@ -355,7 +344,7 @@ class DecisionTree:
         self.max_depth = max_depth # the maximum allowed depth of the tree
         self.gain_ratio = gain_ratio #
         self.root = None # the root node of the tree
-        
+
     def build_tree(self):
         """
         Build a tree using the given impurity measure and training dataset. 
@@ -426,7 +415,7 @@ class DecisionTree:
         # TODO: Implement the function.                                           #
         ###########################################################################
         num_of_correctness = 0
-        for row in dataset:
+        for row in dataset: # Counting how many correct predictions there are
             prediction = self.predict(row)
             if prediction[0] == row[-1]:
                 num_of_correctness += 1
@@ -470,7 +459,6 @@ def depth_pruning(X_train, X_validation):
         #                             END OF YOUR CODE                            #
         ###########################################################################
     return training, validation
-
 
 def chi_pruning(X_train, X_test):
 
@@ -519,7 +507,7 @@ def tree_depth(root):
     - depth: the depth of the tree.
     """
 
-    if root.terminal == True:
+    if root.terminal:
         return root.depth
     
     depth_list = [tree_depth(node) for node in root.children]
@@ -537,7 +525,7 @@ def count_nodes(node):
     ###########################################################################
     # TODO: Implement the function.                                           #
     ###########################################################################
-    if node.treminal == True: # Base case 
+    if node.terminal: # Base case 
         return 1
     
     n_nodes = np.sum([count_nodes(child) for child in node.children]) + 1 # Recursion
